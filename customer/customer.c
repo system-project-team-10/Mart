@@ -142,7 +142,13 @@ void trim(char* str) {
 
 void *lcd_work (void *arg) {
     FILE *in;
-    char username[50];
+    char username[BUFFER_SIZE];
+    char item[BUFFER_SIZE];
+    int total=0, price;
+    char item_full[BUFFER_SIZE];
+
+    char price_str[BUFFER_SIZE], total_str[BUFFER_SIZE];
+
     if ((fd = open(I2C_BUS, O_RDWR)) < 0)
     {
         perror("open I2C device failed.\n");
@@ -160,7 +166,7 @@ void *lcd_work (void *arg) {
     lcd_loc(LINE2);
     type_ln("Tag your ID Card");
 
-    while (1) {
+    while (1) { // 유저 인식
         in = fopen("rfid.txt", "r");
         // printf("fopened\n");
         flock(fileno(in), LOCK_SH);
@@ -179,6 +185,7 @@ void *lcd_work (void *arg) {
                 type_ln("Welcome");
                 lcd_loc(LINE2);
                 type_ln(strcat(username, "!"));
+                usleep(5000000);
                 break;
             }
             else if(strncmp(buffer, "Item:", 5) == 0){
@@ -204,6 +211,66 @@ void *lcd_work (void *arg) {
         // printf("fclosed\n\n");
 
         usleep(1000000);
+    }
+    clr_lcd();
+    lcd_loc(LINE1);
+    type_ln("Tag Item please");
+    lcd_loc(LINE2);
+    type_ln("Total: 0");
+
+    while (1) { // 물품 인식
+        in = fopen("rfid.txt", "r");
+        flock(fileno(in), LOCK_SH);
+        fgets(buffer, BUFFER_SIZE, in);
+        if (strcmp(buffer, "nodata\n") == 0) {
+            read_buffer = 0;
+        }
+        else if (read_buffer == 0) {
+            if (strncmp(buffer, "Item:", 5) == 0) {
+                strncpy(item, buffer + 5, strlen(buffer)-5);
+                item[strlen(buffer)-6]=0;
+                trim(item);
+                char *item_start = item;
+                char *item_end = strchr(item, ',');
+                // item 문자열 추출
+                int item_len = item_end - item_start;
+                char* item_name = (char*)malloc((item_len + 1) * sizeof(char));
+                strncpy(item_name, item_start, item_len);
+                item_name[item_len] = '\0';
+                
+                // 정수 값 추출
+                price = atoi(item_end + 1);
+                printf("%d\n", price);
+                sprintf(price_str, "%d", price);
+                printf("%s\n", price_str);
+
+                clr_lcd();
+                lcd_loc(LINE1);
+                char line1_str[BUFFER_SIZE], line2_str[BUFFER_SIZE];
+                snprintf(line1_str, BUFFER_SIZE, "Item: %s", item_name);
+                snprintf(line2_str, BUFFER_SIZE, "Price: %s", price_str);
+                type_ln(line1_str);
+                lcd_loc(LINE2);
+                type_ln(line2_str);
+                usleep(3000000);
+
+                total += price;
+                sprintf(total_str, "%d", total);
+
+                clr_lcd();
+                lcd_loc(LINE1);
+                type_ln("Tag Item please");
+                lcd_loc(LINE2);
+                snprintf(line2_str, BUFFER_SIZE, "Total: %s", total_str);
+                type_ln(line2_str);
+                usleep(3000000);
+
+                free(item_name);
+            }
+            read_buffer = 1;
+        }
+        flock(fileno(in), LOCK_UN);
+        fclose(in);
     }
 }
 
