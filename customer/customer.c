@@ -242,9 +242,9 @@ void *lcd_work (void *arg) {
                 
                 // 정수 값 추출
                 price = atoi(item_end + 1);
-                printf("%d\n", price);
+                // printf("%d\n", price);
                 sprintf(price_str, "%d", price);
-                printf("%s\n", price_str);
+                // printf("%s\n", price_str);
 
                 clr_lcd();
                 lcd_loc(LINE1);
