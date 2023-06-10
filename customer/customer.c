@@ -31,6 +31,8 @@ void lcd_loc(int);
 void type_ln(const char *);
 void lcd_byte(int, int);
 void lcd_toggle_enable(int);
+void trim(char*);
+void *lcd_work(void*);
 
 int fd;
 
@@ -282,4 +284,3 @@ int main()
     pthread_join(lcd_work_tid, NULL);
     return 0;
 }
-
