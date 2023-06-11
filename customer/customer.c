@@ -426,11 +426,58 @@ void *lcd_work (void *arg) {
 }
 
 void *end_work (void *arg) {
-    int end = 0;
-    scanf("%d", &end);
-    printf("END\n");
-    pthread_cancel(lcd_work_tid);
-    pthread_exit(NULL);
+    int sock;
+    struct sockaddr_in serv_addr;
+    FILE *send_program;
+    char buffer[BUFFER_SERVER_SIZE];
+    // TODO
+    char *ip_addr = "172.20.10.6";
+    int port_addr=23451;
+
+    while (1) {
+        while (1) {
+            sock = socket(PF_INET, SOCK_STREAM, 0);
+            if (sock != -1) break;
+        }
+        memset(&serv_addr, 0, sizeof(serv_addr));
+        serv_addr.sin_family = AF_INET; // address family, IPv4
+        serv_addr.sin_addr.s_addr = inet_addr(ip_addr); // ip 할당
+        serv_addr.sin_port = htons(port_addr); // port 할당, htons = host to network
+
+        while (1) {
+            if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) != -1)
+            break;
+        }
+        FILE *receive_name;
+        receive_name = fopen("receive_name_door.txt", "wb");
+
+        while (1) {
+            ssize_t bytes_received;
+            while (1) {
+                bytes_received = read(sock, buffer, BUFFER_SIZE);
+                if (bytes_received != -1) break;
+            }
+            fwrite(buffer, sizeof(char), bytes_received, receive_name);
+            if (bytes_received < BUFFER_SIZE) break;
+        }
+        fclose(receive_name);
+        receive_name = fopen("receive_name_door.txt", "r");
+        char receive_name_str[20];
+        fscanf(receive_name, "%s", receive_name_str);
+        close(sock);
+
+        printf("customer's username -> %s\n", username);
+        printf("door->server->customer username -> %s\n", receive_name_str);
+        if (strcmp(receive_name_str, username) == 0) {
+            // 일치하면 쇼핑이 끝난것임.
+            printf("END\n");
+            pthread_cancel(lcd_work_tid);
+            pthread_exit(NULL);
+        }
+        else 
+            continue;
+
+    }
 }
 
 int main()

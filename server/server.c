@@ -29,9 +29,54 @@ pthread_t enter_work_tid, exit_work_tid, end_customer_work_tid;
 void *end_customer_work (void *arg) {
     char *username = *(char*)arg;
 
+    int serv_sock, clnt_sock = -1;
+    struct sockaddr_in serv_addr, clnt_addr;
+    socklen_t clnt_addr_size;
+    FILE *receive_username;
+    char buffer[BUFFER_SIZE];
+    // TODO
+    int port=23451;
+    
+    while (1) {
+        serv_sock = socket(PF_INET, SOCK_STREAM, 0);
+        printf("end_customer_work socket...\n");
+        if (serv_sock != -1) break;
+    }
+
+    // serv_addr 구성
+    memset(&serv_addr, 0 , sizeof(serv_addr));
+    // address family, IPv4
+    serv_addr.sin_family = AF_INET;
+    // ip를 할당하는데 server에 존재하는 랜카드 중 사용가능 한 것으로 이루어짐.
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    // port 할당, htons = host to network
+    serv_addr.sin_port = htons(port);
+    
+    
+    while (1) {
+        if(bind(serv_sock, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) != -1) break;
+        printf("end_customer_work binding...\n");
+    }
+    
+    printf("[*] end_customer_work wait for customer...\n");
+    while (1) {
+        if (listen(serv_sock, 5) != -1) break;
+    }
+    clnt_addr_size = sizeof(clnt_addr);
+    while (1) {
+        clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+        if (clnt_sock != -1) break;
+    }  
+    printf("[*] end_customer_work customer connected\n");
+    write(clnt_sock, username, sizeof(username));
+
+    shutdown(clnt_sock, SHUT_RDWR);
+    close(serv_sock);
+    close(clnt_sock);
+
+    pthread_exit(NULL);
+
 }
-
-
 
 
 void *enter_work (void *arg) {
@@ -194,7 +239,11 @@ void *exit_work (void *arg) {
         // 여기서 받은 username을 customer에게 주어야함.
         if (pthread_create(&end_customer_work_tid, NULL, end_customer_work, (void*)&receive_username) != 0)
             perror("end customer work thread create error\n");
-        pthread_join(end_customer_work_tid);
+        pthread_join(end_customer_work_tid, NULL);
+
+        shutdown(clnt_sock, SHUT_RDWR);
+        close(clnt_sock);
+        printf("[*] exit work session closed\n\n");
     }
     
 }
