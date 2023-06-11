@@ -21,6 +21,5 @@ while (True):
     write_file(text+"\n")
     sleep(3)
     write_file("nodata\n")
-    sleep(3)
 
 GPIO.cleanup()
