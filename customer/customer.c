@@ -461,13 +461,14 @@ void *end_work (void *arg) {
             if (bytes_received < BUFFER_SIZE) break;
         }
         fclose(receive_name);
+
         receive_name = fopen("receive_name_door.txt", "r");
         char receive_name_str[20];
-        fscanf(receive_name, "%s", receive_name_str);
+        fgets(receive_name_str, 20, receive_name);
         close(sock);
 
-        printf("customer's username -> %s\n", username);
-        printf("door->server->customer username -> %s\n", receive_name_str);
+        // printf("customer's username -> %s\n", username);
+        // printf("door->server->customer username -> %s\n", receive_name_str);
         if (strcmp(receive_name_str, username) == 0) {
             // 일치하면 쇼핑이 끝난것임.
             printf("END\n");

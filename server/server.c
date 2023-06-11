@@ -27,7 +27,7 @@ pthread_t enter_work_tid, exit_work_tid, end_customer_work_tid;
 
 
 void *end_customer_work (void *arg) {
-    char *username = *(char*)arg;
+    char *username = (char*)arg;
 
     int serv_sock, clnt_sock = -1;
     struct sockaddr_in serv_addr, clnt_addr;
@@ -66,9 +66,24 @@ void *end_customer_work (void *arg) {
     while (1) {
         clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
         if (clnt_sock != -1) break;
-    }  
+    }
     printf("[*] end_customer_work customer connected\n");
-    write(clnt_sock, username, sizeof(username));
+
+    FILE *send_username = fopen("send_user_name.txt", "w");
+    fprintf(send_username, "%s", username);
+    fclose(send_username);
+
+    send_username = fopen("send_user_name.txt", "rb");
+    while (1) {
+        size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, send_username);
+        if (bytes_read > 0) {
+            while (1) {
+                if (write(sock, buffer, bytes_read) != -1)
+                    break;
+            }
+        }else break;
+    }
+    fclose(send_username);
 
     shutdown(clnt_sock, SHUT_RDWR);
     close(serv_sock);
@@ -185,6 +200,7 @@ void *exit_work (void *arg) {
     socklen_t clnt_addr_size;
     FILE *receive_username;
     char buffer[BUFFER_SIZE];
+    char received_username[BUFFER_SIZE];
     // TODO
     int port=54321;
 
@@ -234,10 +250,14 @@ void *exit_work (void *arg) {
             if (bytes_received < BUFFER_SIZE) break;
         }
         fclose(receive_username);
-        printf("exit work username -> %s\n", receive_username);
+        
+        receive_username = fopen("receive_username_door.txt", "r");
+        fgets(received_username, BUFFER_SIZE, receive_username);
+        printf("exit work username -> %s\n", received_username);
+        fclose(receive_username);
 
         // 여기서 받은 username을 customer에게 주어야함.
-        if (pthread_create(&end_customer_work_tid, NULL, end_customer_work, (void*)&receive_username) != 0)
+        if (pthread_create(&end_customer_work_tid, NULL, end_customer_work, (void*)&received_username) != 0)
             perror("end customer work thread create error\n");
         pthread_join(end_customer_work_tid, NULL);
 
