@@ -292,8 +292,9 @@ void *lcd_work (void *arg) {
                 FILE *receive_result;
                 receive_result = fopen("receive_result.txt", "wb");
                 while (1) {
+                    ssize_t bytes_received;
                     while (1) {
-                        ssize_t bytes_received = read(sock, buffer, BUFFER_SIZE);
+                        bytes_received = read(sock, buffer, BUFFER_SIZE);
                         if (bytes_received != -1) break;
                     }
                     fwrite(buffer, sizeof(char), bytes_received, receive_result);
