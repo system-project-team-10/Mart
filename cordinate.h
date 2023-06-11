@@ -65,7 +65,7 @@ predictPoint solveQuadraticAndLinearEquations(double a, double b, double c, doub
 
     double sqrtDiscriminant = sqrt(discriminant);
     y1=((2*b*c/(a*a)+b*e/a+g)+sqrtDiscriminant)/(2*(b*b/(a*a)+f));
-    y2=((2*b*c/(a*a)+b*e/a+g)+sqrtDiscriminant)/(2*(b*b/(a*a)+f));
+    y2=((2*b*c/(a*a)+b*e/a+g)-sqrtDiscriminant)/(2*(b*b/(a*a)+f));
 
 
     // 구한 y 값을 1차식에 대입하여 x의 값을 구함
@@ -80,7 +80,7 @@ predictPoint solveQuadraticAndLinearEquations(double a, double b, double c, doub
 }
 
 
-int main(double beacon1, double beacon2, double beacon3) {
+void get_loc(Point *point, double beacon1, double beacon2, double beacon3) {
 // 세 점의 좌표
     double distanceAB;
     double distanceAC;
@@ -102,7 +102,7 @@ int main(double beacon1, double beacon2, double beacon3) {
 
     dA=spread/4/PI/fq*pow(10, beacon1/20);
     dB=spread/4/PI/fq*pow(10, beacon2/20);
-    dC=spread/4/PI/fq*pow(10, beacon2/20);
+    dC=spread/4/PI/fq*pow(10, beacon3/20);
 
     
     //연립방정식을 통해 x,y값을 구함
@@ -143,9 +143,11 @@ int main(double beacon1, double beacon2, double beacon3) {
     double gapdB2=fabs(distanceB2-dB);
     if(gapdB1>gapdB2){
         printf("x = %lf, y = %lf\n", anw2.x, anw2.y);
+        *point = anw2;
     }
     else{
         printf("x = %lf, y = %lf\n", anw1.x, anw1.y);
+        *point = anw1;
     }
     
     

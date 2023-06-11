@@ -7,22 +7,12 @@
 #include <sys/file.h>
 #include <math.h>
 
-struct Custom{
-    char id[10];
-    float x,y;
-}Custom;
-
-struct Beac{
-    float x,y; //coordinate
-    float coef;   //coefficient
-
-}Beac;
+#include "cordinate.h"
 
 #define BUFFER_SIZE 50
 
 #define ERROR(a,b) ((((a) * (1.1)) < (b)) || (((a) * (0.9) > (b))))
 
-struct Beac beacon[3];
 /**
  * ---------------------------------------------------------------
  * |Beac1                                                   Beac2|
@@ -39,6 +29,10 @@ struct Beac beacon[3];
  * |                            Beac0                            |
  * ---------------------------------------------------------------
 */
+
+/*
+struct Beac beacon[3];
+
 void beacon_init(){
     beacon[0].x=0.;
     beacon[0].y=0.;
@@ -50,25 +44,27 @@ void beacon_init(){
     beacon[2].y=5.;
     beacon[2].coef=-58;
 }
-void rssi_passing(float *input, const char*buffer){
+*/
+
+void rssi_passing(double *input, const char*buffer){
     char temp[BUFFER_SIZE];
     strcpy(temp,buffer);
     char *ptr = strtok(temp, " ");    //첫번째 strtok 사용.
     for(int i=0;i<3;i++){
-        input[i] = (float) atof(ptr);
+        input[i] = (double) atof(ptr);
         ptr = strtok(NULL," ");
     }
 }
-float comp[3] = {0.25, 0.5, 1.};
-void *location(void *coord){
-    struct Custom customer = *(struct Custom *) coord;
+double comp[3] = {0.25, 0.5, 1.};
+void *location(void *point){
+    Point *p = (Point *) point;
     FILE *rssi;
-    float input[3];
-    float curr[3]={0,0,0};
+    double input[3];
+    double curr[3]={0,0,0};
     int cnt[3]={0,0,0};
     char buffer[BUFFER_SIZE];
-    float dist[3];
-    beacon_init();
+    double dist[3];
+    //beacon_init();
     
     while(1){
         // get rssi
@@ -93,13 +89,9 @@ void *location(void *coord){
         }
         //printf("input rssi : %.2f %.2f %.2f\n",input[0],input[1],input[2]);
         //printf("corre rssi : %.2f %.2f %.2f\n",curr[0],curr[1],curr[2]);
+        get_loc(p,curr[0],curr[1],curr[2]);
+        printf("%0.4lf %0.4lf\n",p->x,p->y);
 
-        // calculate distance
-        for(int i=0;i<3;i++){
-            dist[i] = (powf(10.,(beacon[i].coef - curr[i])/20.));
-        }
-        // calculate coordinate
-        printf("%.2f %.2f %.2f\n",dist[0],dist[1],dist[2]);
         // send coord to other socket
         sleep(1);
     }
@@ -110,7 +102,7 @@ void *location(void *coord){
 }
 
 void main(){
-    struct Custom customer={"0000001",0.,0.};
+    Point p;
     
-    *location((void *)&customer);
+    *location((void *)&p);
 }
