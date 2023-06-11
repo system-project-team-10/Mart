@@ -26,6 +26,7 @@
 #define I2C_SMBUS_BYTE_DATA 2
 #define I2C_SMBUS_BLOCK_MAX 32  // SMBus 표준에서 지정된 최대 블록 크기
 #define BUFFER_SIZE 50
+#define BUFFER_SERVER_SIZE 1024
 
 typedef struct _Item_s Item_s;
 void init();
@@ -235,13 +236,90 @@ void *lcd_work (void *arg) {
                 strncpy(username, buffer + 5, strlen(buffer)-5);
                 username[strlen(buffer)-6]=0;
                 trim(username);
+                // line2_str은 ! 붙인거 ex) Sangwon Ko!
                 char line2_str[BUFFER_SIZE];
                 snprintf(line2_str, BUFFER_SIZE, "%s!", username);
+
                 clr_lcd();
                 lcd_loc(LINE1);
-                type_ln("Welcome");
+                type_ln("Please wait");
                 lcd_loc(LINE2);
-                type_ln(line2_str);
+                type_ln("Communicating");
+
+
+                // 여기서 서버랑 만나서 있는 user인지 검증
+                int sock;
+                struct sockaddr_in serv_addr;
+                FILE *send_program;
+                char buffer[BUFFER_SERVER_SIZE];
+                // TODO
+                int ip_addr, port_addr;
+
+                while (1) {
+                    sock = socket(PF_INET, SOCK_STREAM, 0);
+                    if (sock != -1) break;
+                }
+                memset(&serv_addr, 0, sizeof(serv_addr));
+                serv_addr.sin_family = AF_INET; // address family, IPv4
+                serv_addr.sin_addr.s_addr = inet_addr(ip_addr); // ip 할당
+                serv_addr.sin_port = htons(atoi(port_addr)); // port 할당, htons = host to network
+
+                while (1) {
+                    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) != -1)
+                    break;
+                }
+
+                FILE *send_name;
+                send_name = fopen("send_name.txt", "w");
+                fprintf(send_name, "%s", username);
+                fclose(send_name);
+
+                send_name = fopen("send_name.txt", "rb");
+
+                // 이름을 server로 전송하는 과정
+                while (1) {
+                    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, send_name);
+                    if (bytes_read > 0) {
+                        while (1) {
+                            if (write(sock, buffer, bytes_read) != -1)
+                                break;
+                        }
+                    }else break;
+                }
+                fclose(send_name);
+
+                // server에서 결과를 받는 과정
+                FILE *receive_result;
+                receive_result = fopen("receive_result.txt", "wb");
+                while (1) {
+                    while (1) {
+                        ssize_t bytes_received = read(sock, buffer, BUFFER_SIZE);
+                        if (bytes_received != -1) break;
+                    }
+                    fwrite(buffer, sizeof(char), bytes_received, receive_result);
+                    if (bytes_received < BUFFER_SIZE) break;
+                }
+                fclose(receive_result);
+                receive_result = fopen("receive_result.txt", "r");
+                char result[20];
+                fscanf(receive_result, "%s", result);
+                close(sock);
+
+                if (strcmp(result, "match") == 0) {
+                    clr_lcd();
+                    lcd_loc(LINE1);
+                    type_ln("Welcome");
+                    lcd_loc(LINE2);
+                    type_ln(line2_str);
+                }
+                else if (strcmp(result, "not_match") == 0) {
+                    clr_lcd();
+                    lcd_loc(LINE1);
+                    type_ln("Sorry");
+                    lcd_loc(LINE2);
+                    type_ln("not registered");
+                }
+
                 usleep(5000000);
                 break;
             }
@@ -346,8 +424,8 @@ void *end_work (void *arg) {
     printf("END\n");
     pthread_cancel(lcd_work_tid);
     pthread_exit(NULL);
-
 }
+
 int main()
 {
 
