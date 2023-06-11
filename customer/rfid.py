@@ -3,7 +3,6 @@
 import RPi.GPIO as GPIO
 from mfrc522 import SimpleMFRC522
 from time import sleep
-import sys
 import fcntl
 
 reader = SimpleMFRC522()
@@ -17,8 +16,12 @@ def write_file(text):
     f.close()
 
 while (True):
-    _, text = reader.read()
-    write_file(text+"\n")
+    id2, text = reader.read()
+    # TAG 자체 문제로 인한 hardcode.
+    if id2 == 712322887692:
+        write_file("Item: Ramen, 1000"+"\n")
+    else:
+        write_file(text+"\n")
     sleep(3)
     write_file("nodata\n")
 
