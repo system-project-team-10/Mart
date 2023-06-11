@@ -215,14 +215,16 @@ void *lcd_work (void *arg) {
     }
     char buffer[BUFFER_SIZE];
     int read_buffer = 0;
-    clr_lcd();
-    lcd_loc(LINE1);
-    type_ln("Welcome!");
-    lcd_loc(LINE2);
-    type_ln("Tag your ID Card");
 
     while (1) { // 유저 인식
         pthread_testcancel();
+
+        clr_lcd();
+        lcd_loc(LINE1);
+        type_ln("Welcome!");
+        lcd_loc(LINE2);
+        type_ln("Tag your ID Card");
+
         in = fopen("rfid.txt", "r");
         // printf("fopened\n");
         flock(fileno(in), LOCK_SH);
@@ -245,6 +247,7 @@ void *lcd_work (void *arg) {
                 type_ln("Please wait");
                 lcd_loc(LINE2);
                 type_ln("Communicating");
+                usleep(1000000);
 
 
                 // 여기서 서버랑 만나서 있는 user인지 검증
@@ -253,7 +256,8 @@ void *lcd_work (void *arg) {
                 FILE *send_program;
                 char buffer[BUFFER_SERVER_SIZE];
                 // TODO
-                int ip_addr, port_addr;
+                char *ip_addr = "172.20.10.6";
+                int port_addr=12345;
 
                 while (1) {
                     sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -262,23 +266,22 @@ void *lcd_work (void *arg) {
                 memset(&serv_addr, 0, sizeof(serv_addr));
                 serv_addr.sin_family = AF_INET; // address family, IPv4
                 serv_addr.sin_addr.s_addr = inet_addr(ip_addr); // ip 할당
-                serv_addr.sin_port = htons(atoi(port_addr)); // port 할당, htons = host to network
+                serv_addr.sin_port = htons(port_addr); // port 할당, htons = host to network
 
                 while (1) {
                     if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) != -1)
                     break;
                 }
-
                 FILE *send_name;
                 send_name = fopen("send_name.txt", "w");
-                fprintf(send_name, "%s", username);
+                fputs(username, send_name);
                 fclose(send_name);
 
                 send_name = fopen("send_name.txt", "rb");
 
                 // 이름을 server로 전송하는 과정
                 while (1) {
-                    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SIZE, send_name);
+                    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_SERVER_SIZE, send_name);
                     if (bytes_read > 0) {
                         while (1) {
                             if (write(sock, buffer, bytes_read) != -1)
@@ -307,21 +310,24 @@ void *lcd_work (void *arg) {
                 close(sock);
 
                 if (strcmp(result, "match") == 0) {
+                    printf("[*] received match\n");
                     clr_lcd();
                     lcd_loc(LINE1);
                     type_ln("Welcome");
                     lcd_loc(LINE2);
                     type_ln(line2_str);
+                    usleep(5000000);
                 }
                 else if (strcmp(result, "not_match") == 0) {
+                    printf("[*] received not_match\n");
                     clr_lcd();
                     lcd_loc(LINE1);
                     type_ln("Sorry");
                     lcd_loc(LINE2);
                     type_ln("not registered");
+                    usleep(5000000);
+                    continue;
                 }
-
-                usleep(5000000);
                 break;
             }
             else if(strncmp(buffer, "Item:", 5) == 0){

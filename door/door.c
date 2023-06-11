@@ -14,15 +14,9 @@
 #include <ctype.h>
 #include <pthread.h>
 
-#define BUFFER_SIZE 50
+#define BUFFER_SIZE 1024
 
 
-void error_handling(char *message)
-{
-    fputs(message, stderr);
-    fputc('\n', stderr);
-    exit(1);
-}
 void trim(char* str) {
     int start = 0;
     int end = strlen(str) - 1;
@@ -52,30 +46,29 @@ int main(int argc, char *argv[])
     char buffer[BUFFER_SIZE];
     int read_buffer = 0;
 
+    char *ip_addr = "";
+    int port_addr = 54321;
+
     int fd;
     char username[BUFFER_SIZE];
 
-    sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (sock == -1)
-        error_handling("socket() error");
+    while (1) {
+        sock = socket(PF_INET, SOCK_STREAM, 0);
+        if (sock != -1) break;
+    }
 
     // 서버 정보 저장
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
-    serv_addr.sin_port = htons(atoi(argv[2]));
-
-    if (argc != 4)
-    {
-        printf("Usage : %s <IP> <port> <file name>\n", argv[0]);
-        exit(1);
-    }
+    serv_addr.sin_addr.s_addr = inet_addr(ip_addr);
+    serv_addr.sin_port = htons(port_addr);
 
     // 서버와의 연결 시도
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1)
-        error_handling("connect() error");
-
-
+    while (1) {
+        if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) != -1)
+            break;
+    }
+    
     while (1) { // 유저 인식
         in = fopen("user_rfid.txt", "r");
         flock(fileno(in), LOCK_SH);
