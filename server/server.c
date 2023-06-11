@@ -25,6 +25,15 @@ int user_count = 4;
 
 pthread_t enter_work_tid, exit_work_tid, end_customer_work_tid;
 
+
+void *end_customer_work (void *arg) {
+    char *username = *(char*)arg;
+
+}
+
+
+
+
 void *enter_work (void *arg) {
     int serv_sock, clnt_sock = -1;
     struct sockaddr_in serv_addr, clnt_addr;
@@ -100,8 +109,9 @@ void *enter_work (void *arg) {
                         }
                     }else break;
                 }
+                printf("[*] enter work sent match\n");
+                break;
             }
-            printf("[*] enter work sent match\n");
         }
         if (match == 0) {
             // list에 user가 없음, 없다고 customer한테 보내야함
@@ -182,11 +192,10 @@ void *exit_work (void *arg) {
         printf("exit work username -> %s\n", receive_username);
 
         // 여기서 받은 username을 customer에게 주어야함.
+        if (pthread_create(&end_customer_work_tid, NULL, end_customer_work, (void*)&receive_username) != 0)
+            perror("end customer work thread create error\n");
+        pthread_join(end_customer_work_tid);
     }
-    
-}
-
-void *end_customer_work (void *arg) {
     
 }
 
@@ -196,10 +205,10 @@ int main()
         perror("enter work thread create error\n");
     if (pthread_create(&exit_work_tid, NULL, exit_work, NULL) != 0)
         perror("enter work thread create error\n");
-    if (pthread_create(&end_customer_work_tid, NULL, end_customer_work, NULL) != 0)
-        perror("enter work thread create error\n");
+    
 
     pthread_join(enter_work_tid, NULL);
+    pthread_join(exit_work_tid, NULL);
 
     return 0;
 }
