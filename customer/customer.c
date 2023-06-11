@@ -374,6 +374,7 @@ int main()
                                 purchased_item[i].price, purchased_item[i].quantity*purchased_item[i].price);
                     }
                 }
+                fprintf(file, "Total amount: %d\n", total);
                 fprintf(file, "\n");
                 fclose(file);
             }
