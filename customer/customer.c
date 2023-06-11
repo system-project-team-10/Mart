@@ -3,6 +3,10 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <signal.h>
+#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
 #include <linux/i2c-dev.h>
@@ -23,6 +27,9 @@
 #define I2C_SMBUS_BLOCK_MAX 32  // SMBus 표준에서 지정된 최대 블록 크기
 #define BUFFER_SIZE 50
 
+typedef struct _Item_s Item_s;
+void init();
+int merge_duplicate_items ();
 int i2c_smbus_access(int, char, uint8_t, int, union i2c_smbus_data*);
 int i2c_smbus_write_byte(int, int);
 void lcd_init();
@@ -34,9 +41,38 @@ void lcd_toggle_enable(int);
 void trim(char*);
 void *lcd_work(void*);
 
-int fd;
 
-pthread_t lcd_work_tid;
+typedef struct _Item_s {
+    int price;
+    int quantity;
+    char name[50];
+} Item_s;
+
+int fd;
+char username[BUFFER_SIZE];
+Item_s purchased_item[1000];
+int purchased_item_cnt, total;
+
+pthread_t lcd_work_tid, end_work_tid;
+
+
+int merge_duplicate_items () {
+    printf("%s\n", username);
+    printf("%d\n", purchased_item_cnt);
+    if (username[0] == 0 || purchased_item_cnt == 0) return -1;
+    
+    for (int i = 0; i < purchased_item_cnt - 1; i++) {
+        if (purchased_item[i].price != -1) {
+            for (int j = i + 1; j < purchased_item_cnt; j++) {
+                if (strcmp(purchased_item[i].name, purchased_item[j].name) == 0) {
+                    purchased_item[i].quantity++;
+                    purchased_item[j].price = -1; // price가 -1면 다음부터 무시.
+                }
+            }
+        }
+    }
+    return 0;
+}
 
 union i2c_smbus_data
 {
@@ -142,11 +178,27 @@ void trim(char* str) {
     str[len] = '\0';
 }
 
+void init() {
+    for (int i = 0; i < 1000; i++) {
+        purchased_item[i].price = 0;
+        purchased_item[i].quantity = 0;
+        for (int j = 0; j < BUFFER_SIZE; j++)
+            purchased_item[i].name[j] = 0;
+    }
+    for (int i = 0; i < BUFFER_SIZE; i++) {
+        username[i] = 0;
+    }
+    purchased_item_cnt = 0;
+    total = 0;
+    fd = 0;
+}
+
 void *lcd_work (void *arg) {
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    init();
     FILE *in;
-    char username[BUFFER_SIZE];
     char item[BUFFER_SIZE];
-    int total=0, price;
+    int price;
     char item_full[BUFFER_SIZE];
 
     char price_str[BUFFER_SIZE], total_str[BUFFER_SIZE];
@@ -169,6 +221,7 @@ void *lcd_work (void *arg) {
     type_ln("Tag your ID Card");
 
     while (1) { // 유저 인식
+        pthread_testcancel();
         in = fopen("rfid.txt", "r");
         // printf("fopened\n");
         flock(fileno(in), LOCK_SH);
@@ -182,11 +235,13 @@ void *lcd_work (void *arg) {
                 strncpy(username, buffer + 5, strlen(buffer)-5);
                 username[strlen(buffer)-6]=0;
                 trim(username);
+                char line2_str[BUFFER_SIZE];
+                snprintf(line2_str, BUFFER_SIZE, "%s!", username);
                 clr_lcd();
                 lcd_loc(LINE1);
                 type_ln("Welcome");
                 lcd_loc(LINE2);
-                type_ln(strcat(username, "!"));
+                type_ln(line2_str);
                 usleep(5000000);
                 break;
             }
@@ -221,6 +276,7 @@ void *lcd_work (void *arg) {
     type_ln("Total: 0");
 
     while (1) { // 물품 인식
+        pthread_testcancel();
         in = fopen("rfid.txt", "r");
         flock(fileno(in), LOCK_SH);
         fgets(buffer, BUFFER_SIZE, in);
@@ -265,6 +321,13 @@ void *lcd_work (void *arg) {
                 lcd_loc(LINE2);
                 snprintf(line2_str, BUFFER_SIZE, "Total: %s", total_str);
                 type_ln(line2_str);
+
+                purchased_item[purchased_item_cnt].quantity++;
+                purchased_item[purchased_item_cnt].price = price;
+                strcpy(purchased_item[purchased_item_cnt].name, item_name);
+                purchased_item_cnt++;
+
+
                 usleep(3000000);
 
                 free(item_name);
@@ -274,13 +337,56 @@ void *lcd_work (void *arg) {
         flock(fileno(in), LOCK_UN);
         fclose(in);
     }
+    pthread_exit(NULL);
 }
 
+void *end_work (void *arg) {
+    int end = 0;
+    scanf("%d", &end);
+    printf("END\n");
+    pthread_cancel(lcd_work_tid);
+    pthread_exit(NULL);
+
+}
 int main()
 {
 
-    if (pthread_create(&lcd_work_tid, NULL, lcd_work, NULL) != 0)
-        perror("lcd work thread create error\n");
-    pthread_join(lcd_work_tid, NULL);
+    while (1) {
+        if (pthread_create(&lcd_work_tid, NULL, lcd_work, NULL) != 0)
+            perror("lcd work thread create error\n");
+        if (pthread_create(&end_work_tid, NULL, end_work, NULL) != 0)
+            perror("end work thread create error\n");
+
+        pthread_join(lcd_work_tid, NULL);
+        pthread_join(end_work_tid, NULL);
+
+
+        int status;
+        status = merge_duplicate_items();
+
+        if (status == 0) {
+            FILE *file = fopen("purchase_history.txt", "a");
+            if (file != NULL) {
+                fprintf(file, "User: %s\n", username);
+                for (int i = 0; i < purchased_item_cnt; i++) {
+                    if (purchased_item[i].price != -1) {
+                        fprintf(file, "Item: %s, Quantity: %d, Price: %d, Total: %d\n", purchased_item[i].name, purchased_item[i].quantity, 
+                                purchased_item[i].price, purchased_item[i].quantity*purchased_item[i].price);
+                    }
+                }
+                fprintf(file, "\n");
+                fclose(file);
+            }
+        }
+        clr_lcd();
+        lcd_loc(LINE1);
+        type_ln("Thank you!");
+        lcd_loc(LINE2);
+        type_ln("See you later.");
+
+        close(fd);
+        usleep(5000000);
+    }
+
     return 0;
 }
