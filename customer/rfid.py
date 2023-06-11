@@ -19,7 +19,9 @@ while (True):
     id2, text = reader.read()
     # TAG 자체 문제로 인한 hardcode.
     if id2 == 712322887692:
-        write_file("Item: Ramen, 1000"+"\n")
+        write_file("Item: Ramen, 1000\n")
+    elif id2 == 657940568739:
+        write_file("Item: Coffee, 2000\n")
     else:
         write_file(text+"\n")
     sleep(3)
